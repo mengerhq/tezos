@@ -56,6 +56,8 @@ val clear_block: net_db -> Block_hash.t -> int -> unit
 
 val inject_operation:
   net_db -> Operation_hash.t -> Operation.t -> bool tzresult Lwt.t
+val clear_operations:
+  net_db -> Operation_hash.t list list -> unit
 
 val commit_protocol:
   db -> Protocol_hash.t -> bool tzresult Lwt.t
