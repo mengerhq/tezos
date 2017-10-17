@@ -14,7 +14,7 @@ open Error_monad
 open P2p_types
 include Logging.Make (struct let name = "test.p2p.connection" end)
 
-let default_addr = Ipaddr.V6.localhost
+let default_addr = Ipaddr.V6.of_string_exn "::ffff:127.0.0.1"
 
 let proof_of_work_target = Crypto_box.make_target 16.
 let id1 = Identity.generate proof_of_work_target

@@ -236,7 +236,7 @@ module Garbled = struct
 
 end
 
-let addr = ref Ipaddr.V6.localhost
+let addr = ref (Ipaddr.V6.of_string_exn "::ffff:127.0.0.1")
 let port = ref (1024 + Random.int 8192)
 let clients = ref 10
 let repeat_connections = ref 5

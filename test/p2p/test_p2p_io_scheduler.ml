@@ -159,7 +159,7 @@ let run
 
 let () = Random.self_init ()
 
-let addr = ref Ipaddr.V6.localhost
+let addr = ref (Ipaddr.V6.of_string_exn "::ffff:127.0.0.1")
 let port = ref None
 
 let max_download_speed = ref None
