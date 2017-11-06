@@ -24,7 +24,7 @@ module type DISTRIBUTED_DB = sig
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
   val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
 
-  val clear: t -> key -> unit
+  val clear_or_cancel: t -> key -> unit
   val inject: t -> key -> value -> bool Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
 
@@ -56,6 +56,7 @@ module type SCHEDULER_EVENTS = sig
   type key
   val request: t -> P2p.Peer_id.t option -> key -> unit
   val notify: t -> P2p.Peer_id.t -> key -> unit
+  val notify_cancelation: t -> key -> unit
   val notify_unrequested: t -> P2p.Peer_id.t -> key -> unit
   val notify_duplicate: t -> P2p.Peer_id.t -> key -> unit
   val notify_invalid: t -> P2p.Peer_id.t -> key -> unit
@@ -206,10 +207,13 @@ end = struct
     | Found _ ->
         Lwt.return_false
 
-  let clear s k =
+  let clear_or_cancel s k =
     match Memory_table.find s.memory k with
     | exception Not_found -> ()
-    | Pending _ -> assert false
+    | Pending (w, _) ->
+        Scheduler.notify_cancelation s.scheduler k ;
+        Memory_table.remove s.memory k ;
+        Lwt.wakeup_later_exn w Lwt.Canceled
     | Found _ -> Memory_table.remove s.memory k
 
   let watch s = Watcher.create_stream s.input
@@ -252,6 +256,7 @@ end = struct
   and event =
     | Request of P2p.Peer_id.t option * key
     | Notify of P2p.Peer_id.t * key
+    | Notify_cancelation of key
     | Notify_invalid of P2p.Peer_id.t * key
     | Notify_duplicate of P2p.Peer_id.t * key
     | Notify_unrequested of P2p.Peer_id.t * key
@@ -260,6 +265,8 @@ end = struct
     t.push_to_worker (Request (p, k))
   let notify t p k =
     t.push_to_worker (Notify (p, k))
+  let notify_cancelation t k =
+    t.push_to_worker (Notify_cancelation k)
   let notify_invalid t p k =
     t.push_to_worker (Notify_invalid (p, k))
   let notify_duplicate t p k =
@@ -314,6 +321,7 @@ end = struct
     | Notify (_gid, key) ->
         Table.remove state.pending key ;
         Lwt.return_unit
+    | Notify_cancelation _
     | Notify_invalid _
     | Notify_unrequested _
     | Notify_duplicate _ ->
