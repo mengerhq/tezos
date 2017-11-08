@@ -102,8 +102,8 @@ UTILS_LIB_INTFS := \
   utils/time.mli \
   utils/hash.mli \
   utils/error_monad.mli \
-  utils/lwt_exit.mli \
   utils/logging.mli \
+  utils/lwt_exit.mli \
   utils/lwt_utils.mli \
   utils/lwt_pipe.mli \
   utils/IO.mli \
@@ -121,8 +121,8 @@ UTILS_LIB_IMPLS := \
   utils/time.ml \
   utils/hash.ml \
   utils/crypto_box.ml \
-  utils/lwt_exit.ml \
   utils/logging.ml \
+  utils/lwt_exit.ml \
   utils/lwt_utils.ml \
   utils/lwt_pipe.ml \
   utils/IO.ml \
