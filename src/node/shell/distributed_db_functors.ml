@@ -14,6 +14,8 @@ module type DISTRIBUTED_DB = sig
   type value
   type param
 
+  type error += Canceled of key
+
   val known: t -> key -> bool Lwt.t
 
   type error += Missing_data of key
@@ -22,7 +24,7 @@ module type DISTRIBUTED_DB = sig
   val read_exn: t -> key -> value Lwt.t
 
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
-  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
+  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value tzresult Lwt.t
 
   val clear_or_cancel: t -> key -> unit
   val inject: t -> key -> value -> bool Lwt.t
@@ -97,6 +99,23 @@ end = struct
   type value = Disk_table.value
   type param = Precheck.param
 
+  type error += Canceled of key
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~title: ("Canceled fetch of a " ^ Hash.name)
+      ~description: ("The fetch of a " ^ Hash.name
+                     ^ " has been spuriously canceled")
+      ~id: ("ddb.canceled_fetch." ^ Hash.name)
+      ~pp: (fun ppf key ->
+          Format.fprintf ppf
+            "Fetch of %s %a canceled spuriously"
+            Hash.name Hash.pp key)
+      Data_encoding.(obj1 (req "resource" Hash.encoding))
+      (function (Canceled key) -> Some key | _ -> None)
+      (fun key -> Canceled key)
+
   type t = {
     scheduler: Scheduler.t ;
     disk: Disk_table.store ;
@@ -106,7 +125,7 @@ end = struct
   }
 
   and status =
-    | Pending of value Lwt.u * param
+    | Pending of value tzresult Lwt.u * param
     | Found of value
 
   let known s k =
@@ -157,10 +176,10 @@ end = struct
           Memory_table.add s.memory k (Pending (wakener, param)) ;
           Scheduler.request s.scheduler peer k ;
           waiter
-        | Some v -> Lwt.return v
+        | Some v -> Lwt.return (Ok v)
       end
     | Pending (w, _) -> Lwt.waiter_of_wakener w
-    | Found v -> Lwt.return v
+    | Found v -> Lwt.return (Ok v)
 
   let prefetch s ?peer k param = Lwt.ignore_result (fetch s ?peer k param)
 
@@ -183,7 +202,7 @@ end = struct
         | Some v ->
             Scheduler.notify s.scheduler p k ;
             Memory_table.replace s.memory k (Found v) ;
-            Lwt.wakeup w v ;
+            Lwt.wakeup w (Ok v) ;
             iter_option s.global_input
               ~f:(fun input -> Watcher.notify input (k, v)) ;
             Watcher.notify s.input (k, v) ;
@@ -213,7 +232,7 @@ end = struct
     | Pending (w, _) ->
         Scheduler.notify_cancelation s.scheduler k ;
         Memory_table.remove s.memory k ;
-        Lwt.wakeup_later_exn w Lwt.Canceled
+        Lwt.wakeup_later w (Error [ Canceled k ])
     | Found _ -> Memory_table.remove s.memory k
 
   let watch s = Watcher.create_stream s.input

@@ -14,6 +14,8 @@ module type DISTRIBUTED_DB = sig
   type value
   type param
 
+  type error += Canceled of key
+
   val known: t -> key -> bool Lwt.t
 
   type error += Missing_data of key
@@ -22,7 +24,7 @@ module type DISTRIBUTED_DB = sig
   val read_exn: t -> key -> value Lwt.t
 
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
-  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
+  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value tzresult Lwt.t
 
   val clear_or_cancel: t -> key -> unit
   val inject: t -> key -> value -> bool Lwt.t

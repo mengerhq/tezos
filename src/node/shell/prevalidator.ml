@@ -251,10 +251,18 @@ let create net_db =
                       ops in
                   let fetch op =
                     Distributed_db.Operation.fetch
-                      net_db ~peer:gid op () >>= fun _op ->
-                    push_to_worker (`Handle op) ;
-                    Lwt.return_unit
-                  in
+                      net_db ~peer:gid op () >>= function
+                    | Ok _ ->
+                        push_to_worker (`Handle op) ;
+                        Lwt.return ()
+                    | Error [ Distributed_db.Operation.Canceled _ ] ->
+                        lwt_debug
+                          "operation %a included before being prevalidated"
+                          Operation_hash.pp_short op >>= fun () ->
+                        Lwt.return ()
+                    | Error _ ->
+                        (* should not happen *)
+                        Lwt.return () in
                   List.iter
                     (fun op -> Operation_hash.Table.add pending op (fetch op))
                     unknown_ops ;
