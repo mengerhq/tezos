@@ -15,7 +15,7 @@ let proof_of_work_nonce_size = 8
 let nonce_length = 32
 
 let roll_value =
-  Tez_repr.of_cents_exn 10000_00L
+  Tez_repr.of_cents_exn 30000_00L
 let seed_nonce_revelation_tip =
   Tez_repr.of_cents_exn 10_00L
 let origination_burn =
@@ -50,15 +50,14 @@ let read_public_key s =
   Ed25519.Public_key.of_bytes (Bytes.of_string (Hex_encode.hex_decode s))
 
 let default = {
-  cycle_length = 2048l ;
-  voting_period_length = 32768l ;
+  cycle_length = 64l ;
+  voting_period_length = 1024l ;
   time_before_reward =
     Period_repr.of_seconds_exn
-      (* One year in seconds *)
-      Int64.(mul 365L (mul 24L 3600L)) ;
+      Int64.(mul 6L 3600L) ; (* 6 hours *)
   slot_durations =
-    List.map Period_repr.of_seconds_exn [ 60L ] ;
-  first_free_mining_slot = 16 ;
+    List.map Period_repr.of_seconds_exn [ 60L ; 30L ; 30L ; 30L ; 10L ] ;
+  first_free_mining_slot = 4 ;
   max_signing_slot = 15 ;
   instructions_per_transaction = 16 * 1024 ;
   proof_of_work_threshold =
